@@ -1,140 +1,104 @@
-import pickle
 import streamlit as st
-import pandas as pd
+import pickle
 import requests
+import os
+import pandas as pd
 
-# ============================================================
-#                  NETFLIX STYLE UI THEMING
-# ============================================================
-st.markdown("""
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+# ---------------------------------------------
+# GOOGLE DRIVE DOWNLOAD FOR similarity.pkl
+# ---------------------------------------------
+def download_similarity():
+    url = "https://drive.google.com/uc?export=download&id=1oV3po_Vf-Aes_NF1jAzunESTHZ9_32oX"
 
-<style>
-* {
-    font-family: 'Poppins', sans-serif;
-}
+    if not os.path.exists("similarity.pkl"):
+        st.write("Downloading similarity data... Please wait.")
+        r = requests.get(url)
+        with open("similarity.pkl", "wb") as f:
+            f.write(r.content)
+        st.write("Download complete!")
 
-/* APP BACKGROUND */
-.stApp {
-    background-color: #141414;
-}
+download_similarity()
 
-/* TITLE */
-h1, h2, h3 {
-    color: #E50914 !important;
-    font-weight: 700 !important;
-    text-align: center !important;
-}
+# Load similarity file
+with open("similarity.pkl", "rb") as f:
+    similarity = pickle.load(f)
 
-/* SELECTBOX LABEL */
-.css-1p3n8nr, label {
-    color: #ffffff !important;
-    font-size: 18px !important;
-    font-weight: 600;
-}
+# Load movies dict
+movies_dict = pickle.load(open('movies.pkl', 'rb'))
+movies = pd.DataFrame(movies_dict)
 
-/* SELECTBOX DROPDOWN */
-.stSelectbox div {
-    background-color: #2b2b2b !important;
-    color: white !important;
-    border-radius: 8px;
-}
 
-/* BUTTON */
-.stButton button {
-    background-color: #E50914 !important;
-    color: white !important;
-    border-radius: 8px;
-    padding: 10px 25px;
-    font-size: 18px;
-    border: none;
-    font-weight: 600;
-    transition: 0.3s;
-}
-
-.stButton button:hover {
-    background-color: #b20710 !important;
-    transform: scale(1.03);
-}
-
-/* MOVIE TITLE UNDER POSTER */
-.movie-title {
-    color: #ffffff;
-    background-color: #E50914;
-    padding: 6px;
-    text-align: center;
-    margin-top: 8px;
-    border-radius: 6px;
-    font-weight: 600;
-}
-
-/* POSTER HOVER EFFECT */
-.poster-container img {
-    border-radius: 10px;
-    transition: 0.3s ease-in-out;
-    border: 2px solid transparent;
-}
-
-.poster-container img:hover {
-    transform: scale(1.08);
-    border: 2px solid #E50914;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ============================================================
-#                  OMDb POSTER DOWNLOAD
-# ============================================================
-API_KEY = "ccd9f1f8"  # your OMDb API Key
+# ---------------------------------------------
+# FETCH MOVIE POSTER FROM OMDb API
+# ---------------------------------------------
+API_KEY = "ccd9f1f8"   # your OMDb API key
 
 def fetch_poster(movie_title):
     url = f"http://www.omdbapi.com/?t={movie_title}&apikey={API_KEY}"
     data = requests.get(url).json()
-    return data.get("Poster", "")
 
-# ============================================================
-#                     RECOMMENDATION LOGIC
-# ============================================================
+    if data.get("Response") == "True":
+        return data.get("Poster")
+    else:
+        return "https://via.placeholder.com/300x450?text=No+Image"
+
+
+# ---------------------------------------------
+# RECOMMENDATION FUNCTION
+# ---------------------------------------------
 def recommend(movie):
-    movie_index = movies[movies['title'] == movie].index[0]
-    distances = similarity[movie_index]
-    movie_list = sorted(list(enumerate(distances)),
-                        reverse=True,
-                        key=lambda x: x[1])[1:6]
+    idx = movies[movies['title'] == movie].index[0]
+    distances = similarity[idx]
+    movie_list = sorted(list(enumerate(distances)), reverse=True, key=lambda x: x[1])[1:11]
 
-    recommended_movies = []
+    recommended_titles = []
     recommended_posters = []
 
     for i in movie_list:
-        title = movies.iloc[i[0]].title
-        recommended_movies.append(title)
-        recommended_posters.append(fetch_poster(title))
+        movie_title = movies.iloc[i[0]].title
+        recommended_titles.append(movie_title)
+        recommended_posters.append(fetch_poster(movie_title))
 
-    return recommended_movies, recommended_posters
+    return recommended_titles, recommended_posters
 
-# ============================================================
-#                           MAIN UI
-# ============================================================
-st.title("🎬 Movie Recommender")
 
-movies_dict = pickle.load(open('movie_dict.pkl', 'rb'))
-movies = pd.DataFrame(movies_dict)
-similarity = pickle.load(open('similarity.pkl', 'rb'))
+# ---------------------------------------------
+# PAGE STYLING
+# ---------------------------------------------
+st.markdown("""
+    <style>
+        body {
+            background-color: #000000;
+        }
+        .title {
+            font-size: 50px;
+            font-weight: 800;
+            color: red;
+            text-align: center;
+            padding-bottom: 20px;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
+st.markdown('<div class="title">🎬 Movie Recommender</div>', unsafe_allow_html=True)
+
+
+# ---------------------------------------------
+# UI
+# ---------------------------------------------
 selected_movie = st.selectbox(
-    "Choose a movie you watched:",
+    "Search or select a movie",
     movies['title'].values
 )
 
-if st.button("Show Recommendation"):
-    names, posters = recommend(selected_movie)
+if st.button("Recommend"):
+    with st.spinner("Finding similar movies..."):
+        names, posters = recommend(selected_movie)
 
-    st.markdown("<h3>🔥 Recommended For You</h3>", unsafe_allow_html=True)
-
+    st.subheader("Recommended Movies")
     cols = st.columns(5)
-    for i in range(5):
-        with cols[i]:
-            st.markdown('<div class="poster-container">', unsafe_allow_html=True)
-            st.image(posters[i])
-            st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="movie-title">{names[i]}</div>', unsafe_allow_html=True)
+
+    for i in range(10):
+        with cols[i % 5]:
+            st.image(posters[i], use_column_width=True)
+            st.write(names[i])

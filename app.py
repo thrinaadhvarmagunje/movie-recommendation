@@ -143,7 +143,7 @@ def recommend(movie):
 # ============================================================
 #                         UI
 # ============================================================
-st.title("🎬 Netflix-Style Movie Recommender")
+st.title("🎬 A Movie Recommender App")
 
 selected_movie = st.selectbox(
     "Choose a movie you watched:",
@@ -162,3 +162,4 @@ if st.button("Show Recommendation"):
             st.image(posters[i], use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="movie-title">{names[i]}</div>', unsafe_allow_html=True)
+

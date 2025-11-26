@@ -10,28 +10,49 @@ import os
 import requests
 import os
 
+import requests
+import os
+
 def download_similarity():
     file_id = "1oV3po_Vf-Aes_NF1jAzunESTHZ9_32oX"
-    base_url = "https://drive.google.com/uc?export=download"
+    destination = "similarity.pkl"
 
+    if os.path.exists(destination):
+        return  # already downloaded
+
+    print("Downloading similarity.pkl from Google Drive...")
+
+    URL = "https://drive.google.com/uc?export=download"
     session = requests.Session()
-    response = session.get(base_url, params={"id": file_id}, stream=True)
 
-    # Detect confirmation token (Google Drive large file fix)
-    for key, value in response.cookies.items():
-        if key.startswith("download_warning"):
-            token = value
-            response = session.get(base_url, params={"id": file_id, "confirm": token}, stream=True)
-            break
+    # First request
+    response = session.get(URL, params={"id": file_id}, stream=True)
+    
+    # Check if a confirmation token is needed
+    def get_confirm_token(response):
+        for key, value in response.cookies.items():
+            if key.startswith("download_warning"):
+                return value
+        return None
 
-    # Save the file
-    with open("similarity.pkl", "wb") as f:
-        for chunk in response.iter_content(1024):
+    token = get_confirm_token(response)
+
+    if token:
+        # Second request with confirm token
+        response = session.get(
+            URL,
+            params={"id": file_id, "confirm": token},
+            stream=True
+        )
+
+    # Download the file in chunks
+    with open(destination, "wb") as f:
+        for chunk in response.iter_content(32768):
             if chunk:
                 f.write(chunk)
 
+    print("Download complete!")
 
-download_similarity()
 
 
 # ============================================================
@@ -155,7 +176,7 @@ def recommend(movie):
 # ============================================================
 movies_dict = pickle.load(open('movie_dict.pkl', 'rb'))   # correct name
 movies = pd.DataFrame(movies_dict)
-
+download_similarity()
 with open("similarity.pkl", "rb") as f:
     similarity = pickle.load(f)
 
@@ -183,4 +204,5 @@ if st.button("Show Recommendation"):
             st.image(posters[i], use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="movie-title">{names[i]}</div>', unsafe_allow_html=True)
+
 

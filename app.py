@@ -5,14 +5,8 @@ import requests
 import os
 
 # ============================================================
-# Google Drive File Download (Fix for 25MB limit)
+#           GOOGLE DRIVE DOWNLOAD (LARGE FILE FIX)
 # ============================================================
-import requests
-import os
-
-import requests
-import os
-
 def download_similarity():
     file_id = "1oV3po_Vf-Aes_NF1jAzunESTHZ9_32oX"
     destination = "similarity.pkl"
@@ -20,15 +14,15 @@ def download_similarity():
     if os.path.exists(destination):
         return  # already downloaded
 
-    print("Downloading similarity.pkl from Google Drive...")
+    st.write("Downloading similarity data from Google Drive...")
 
     URL = "https://drive.google.com/uc?export=download"
     session = requests.Session()
 
     # First request
     response = session.get(URL, params={"id": file_id}, stream=True)
-    
-    # Check if a confirmation token is needed
+
+    # Check for confirm token
     def get_confirm_token(response):
         for key, value in response.cookies.items():
             if key.startswith("download_warning"):
@@ -38,21 +32,19 @@ def download_similarity():
     token = get_confirm_token(response)
 
     if token:
-        # Second request with confirm token
-        response = session.get(
-            URL,
-            params={"id": file_id, "confirm": token},
-            stream=True
-        )
+        params = {"id": file_id, "confirm": token}
+        response = session.get(URL, params=params, stream=True)
 
-    # Download the file in chunks
+    # Save the file
     with open(destination, "wb") as f:
         for chunk in response.iter_content(32768):
             if chunk:
                 f.write(chunk)
 
-    print("Download complete!")
+    st.success("Download complete!")
 
+# Download similarity file
+download_similarity()
 
 
 # ============================================================
@@ -62,13 +54,9 @@ st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 
 <style>
-* {
-    font-family: 'Poppins', sans-serif;
-}
+* { font-family: 'Poppins', sans-serif; }
 
-.stApp {
-    background-color: #141414;
-}
+.stApp { background-color: #141414; }
 
 h1, h2, h3 {
     color: #E50914 !important;
@@ -128,7 +116,6 @@ label, .css-1p3n8nr {
 """, unsafe_allow_html=True)
 
 
-
 # ============================================================
 #                FIXED OMDb POSTER FETCHING
 # ============================================================
@@ -141,9 +128,7 @@ def fetch_poster(movie_title):
     if data.get("Response") == "True" and data.get("Poster") != "N/A":
         return data["Poster"]
 
-    # fallback image
     return "https://via.placeholder.com/300x450/000000/FFFFFF?text=No+Poster"
-
 
 
 # ============================================================
@@ -170,22 +155,20 @@ def recommend(movie):
     return recommended_movies, recommended_posters
 
 
-
 # ============================================================
-#                        LOAD RESOURCES
+#                        LOAD FILES
 # ============================================================
-movies_dict = pickle.load(open('movie_dict.pkl', 'rb'))   # correct name
+movies_dict = pickle.load(open('movie_dict.pkl', 'rb'))
 movies = pd.DataFrame(movies_dict)
-download_similarity()
+
 with open("similarity.pkl", "rb") as f:
     similarity = pickle.load(f)
-
 
 
 # ============================================================
 #                          MAIN UI
 # ============================================================
-st.title("🎬 Welcome to the Movie Recommender App")
+st.title("🎬 Netflix-Style Movie Recommender")
 
 selected_movie = st.selectbox(
     "Choose a movie you watched:",
@@ -204,5 +187,3 @@ if st.button("Show Recommendation"):
             st.image(posters[i], use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="movie-title">{names[i]}</div>', unsafe_allow_html=True)
-
-

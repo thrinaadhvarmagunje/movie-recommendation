@@ -7,13 +7,29 @@ import os
 # ============================================================
 # Google Drive File Download (Fix for 25MB limit)
 # ============================================================
-def download_similarity():
-    url = "https://drive.google.com/uc?export=download&id=1oV3po_Vf-Aes_NF1jAzunESTHZ9_32oX"
+import requests
+import os
 
-    if not os.path.exists("similarity.pkl"):
-        r = requests.get(url)
-        with open("similarity.pkl", "wb") as f:
-            f.write(r.content)
+def download_similarity():
+    file_id = "1oV3po_Vf-Aes_NF1jAzunESTHZ9_32oX"
+    base_url = "https://drive.google.com/uc?export=download"
+
+    session = requests.Session()
+    response = session.get(base_url, params={"id": file_id}, stream=True)
+
+    # Detect confirmation token (Google Drive large file fix)
+    for key, value in response.cookies.items():
+        if key.startswith("download_warning"):
+            token = value
+            response = session.get(base_url, params={"id": file_id, "confirm": token}, stream=True)
+            break
+
+    # Save the file
+    with open("similarity.pkl", "wb") as f:
+        for chunk in response.iter_content(1024):
+            if chunk:
+                f.write(chunk)
+
 
 download_similarity()
 
@@ -167,3 +183,4 @@ if st.button("Show Recommendation"):
             st.image(posters[i], use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="movie-title">{names[i]}</div>', unsafe_allow_html=True)
+
